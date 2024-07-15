@@ -1,0 +1,128 @@
+plugins {
+    id 'org.springframework.boot' version '3.1.0'
+    id 'java'
+    id 'com.google.cloud.tools.jib' version '3.2.1'
+}
+
+apply plugin: 'java'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'org.springframework.boot'
+
+// 指定JDK版本
+sourceCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_17
+// 指定编码格式
+[compileJava, compileTestJava, javadoc]*.options*.encoding = 'UTF-8'
+
+// 所有模块/项目的通用配置
+allprojects {
+    group = 'cn.catguild'
+    version = '1.0-SNAPSHOT'
+    repositories {
+        //maven仓库
+        mavenLocal()
+//        maven { url 'https://maven.aliyun.com/repository/central/' }
+//        maven { url 'https://maven.aliyun.com/repository/public/' }
+//        maven { url 'https://maven.aliyun.com/repository/spring/' }
+//        maven { url 'https://maven.aliyun.com/repository/google/' }
+//        maven { url 'https://maven.aliyun.com/repository/gradle-plugin/' }
+//        maven { url 'https://maven.aliyun.com/repository/spring-plugin/' }
+//        maven { url 'https://maven.aliyun.com/repository/grails-core/' }
+//        maven { url 'https://maven.aliyun.com/repository/apache-snapshots/' }
+//        maven { url 'https://repo.spring.io/milestone/' }
+        mavenCentral()
+    }
+}
+
+// 版本管理
+description = "统一网关"
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:2022.0.3"
+        mavenBom "com.alibaba.cloud:spring-cloud-alibaba-dependencies:2022.0.0.0-RC2"
+    }
+}
+
+dependencies {
+    //服务健康
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    //cloud组件
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
+    // 服务注册与发现
+    implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config'
+    implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
+
+    //lombok
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.24'
+    testCompileOnly 'org.projectlombok:lombok:1.18.24'
+}
+
+compileJava {
+    options.compilerArgs += [
+        '-Amapstruct.suppressGeneratorTimestamp=true',
+        '-Amapstruct.suppressGeneratorVersionInfoComment=true',
+        '-Amapstruct.verbose=true'
+    ]
+}
+
+sourceSets {
+    main {
+        resources {
+            //可以将java目录下的所有非.java资源打包到classes下
+            srcDir 'src/main/java'
+        }
+    }
+
+    test {
+        resources {
+            //可以将java目录下的所有非.java资源打包到classes下
+            srcDir 'src/test/groovy'
+        }
+    }
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
+tasks.register('copyTestResources', Copy) {
+    from "${projectDir}/src/test/resources"
+    into "${buildDir}/resources/test"
+}
+
+processTestResources.dependsOn copyTestResources
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.warnings = false
+    options.deprecation = true
+    options.compilerArgs += ["-parameters"]
+}
+
+//    tasks.withType(Test).tap {
+//        configureEach {
+//            // 跳过测试
+//            enabled = false
+//        }
+//    }
+
+jib {
+    to {
+        image = 'huaxiexiyan/gateway:main'
+    }
+    container {
+        jvmFlags = ['-Xmx64m', '-Xms64m'] // 添加堆内存参数
+        creationTime = 'USE_CURRENT_TIMESTAMP'
+        environment = [
+            'TZ': 'Asia/Shanghai'
+        ]
+    }
+}
